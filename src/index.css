@@ -1,0 +1,54 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap');
+
+@import "tailwindcss";
+
+
+.interSemibold{
+  font-family: "Inter", sans-serif;
+  font-weight: 700;
+
+}
+
+.interRegular{
+  font-family: "Inter", sans-serif;
+  font-weight: 500;
+
+}
+
+html,body{
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  overflow-x: hidden;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+/* 
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+} */
+
+
+
+h1,h2,h3,h4,h5,h6,p,span{
+  line-height: 100%;
+}
+
+*{
+  box-sizing: border-box
+}
+
+
+@theme inline {
+  --color-main: #DD6700;
+}
