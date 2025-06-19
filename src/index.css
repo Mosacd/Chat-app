@@ -39,6 +39,42 @@ body,
 } */
 
 
+.custom-emoji-picker * {
+  scrollbar-width: thin;
+  scrollbar-color: #888 transparent;
+}
+
+.custom-emoji-picker ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.custom-emoji-picker ::-webkit-scrollbar-thumb {
+  background-color: #888;
+  border-radius: 4px;
+}
+
+.custom-emoji-picker ::-webkit-scrollbar-thumb:hover {
+  background-color: #aaa;
+}
+
+
+@layer utilities {
+  @keyframes slideIn {
+    from {
+      transform: translateY(20px) scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0) scale(1);
+      opacity: 1;
+    }
+  }
+
+  .animate-slideIn {
+    animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+}
+
 
 h1,h2,h3,h4,h5,h6,p,span{
   line-height: 100%;
