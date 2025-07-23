@@ -1,30 +1,179 @@
 import { useState, useRef, useEffect } from 'react';
 import EmojiPicker from 'emoji-picker-react';
+import * as signalR from '@microsoft/signalr';
+import StickerDisplay from './stickerdisplay';
+import type { Message, Sticker, StickerPack } from '@/src/utils/types';
+import MessageItem from '@/src/components/messages';
+import AdvertTab from './advertTabs';
 
-interface Message {
-  id: string;
-  text: string;
-  sender: 'user' | 'other';
-  timestamp: Date;
-}
+
 
 const Chat = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  // const [users, setUsers] = useState<User[]>([]);
+  // const [userId, setUserId] = useState<string>('');
+  const [chatStatus, setChatStatus] = useState<string>('Connecting...');
+  
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
-  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const connectionRef = useRef<signalR.HubConnection | null>(null);
 
-  // Handle outside click to close emoji picker
+  const [stickerPacks, setStickerPacks] = useState<StickerPack[]>([]);
+  const [currentPack, setCurrentPack] = useState<StickerPack | null>(null);
+  const [activeTabIndex, setActiveTabIndex] = useState(0);
+  const [isLoadingStickers, setIsLoadingStickers] = useState(false);
+  const [stickerError, setStickerError] = useState<string | null>(null);
+
+  // Load sticker packs
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
-        setShowEmojiPicker(false);
+    const loadStickerPacks = async () => {
+      try {
+        setIsLoadingStickers(true);
+        setStickerError(null);
+        
+        const response = await fetch('https://chat.kiuvinme.ge/sticker/GetStickerPacks');
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const packs = await response.json();
+        setStickerPacks(packs);
+        
+        // Select the first pack by default
+        if (packs.length > 0) {
+          selectStickerPack(packs[0], 0);
+        }
+      } catch (err) {
+        console.error("Failed to load sticker packs:", err);
+        setStickerError(err instanceof Error ? err.message : 'Unknown error');
+      } finally {
+        setIsLoadingStickers(false);
       }
     };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+
+    loadStickerPacks();
+  }, []);
+
+  // Select sticker pack handler
+  const selectStickerPack = async (pack: StickerPack, index: number) => {
+    try {
+      setIsLoadingStickers(true);
+      setActiveTabIndex(index);
+      setCurrentPack(pack);
+      
+      // Only fetch stickers if we don't have them already
+      if (!pack.stickers) {
+        const response = await fetch(
+          `https://chat.kiuvinme.ge/sticker/GetStickersFromPack?packId=${pack.uid}`
+        );
+        
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        
+        const stickers: Sticker[] = await response.json();
+        
+        // Update the pack with the loaded stickers
+        setStickerPacks(prevPacks =>
+          prevPacks.map(p => 
+            p.uid === pack.uid ? { ...p, stickers } : p
+          )
+        );
+      }
+    } catch (err) {
+      console.error("Failed to load stickers:", err);
+      setStickerError(err instanceof Error ? err.message : 'Unknown error');
+    } finally {
+      setIsLoadingStickers(false);
+    }
+  };
+
+  // Initialize SignalR connection
+  useEffect(() => {
+    const connection = new signalR.HubConnectionBuilder()
+      .withUrl("https://chat.kiuvinme.ge/chatHub")
+      .configureLogging(signalR.LogLevel.Information)
+      .withAutomaticReconnect()
+      .build();
+    console.log(connectionRef.current)
+    connectionRef.current = connection;
+
+    // Setup message handlers
+    connection.on("ReceiveMessage", (messageData: any) => {
+      console.log(messageData.type);
+      if(messageData.type !== "sticker"){
+         setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        text: messageData.content,
+        sender: messageData.senderId || 'Stranger',
+        timestamp: new Date(messageData.timestamp),
+        isOwn: false,
+      }]);
+      } else{
+         setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        text: messageData.displayName,
+        sender: messageData.senderId || 'Stranger',
+        timestamp: new Date(messageData.timestamp),
+        isOwn: false,
+        isSticker: true,
+        stickerUrl: messageData.stickerUrl
+      }]);
+      }
+
+     
+    });
+
+    // connection.on("ReceiveSticker", (stickerData: any) => {
+    //   setMessages(prev => [...prev, {
+    //     id: Date.now().toString(),
+    //     text: stickerData.displayName,
+    //     sender: stickerData.senderId || 'Stranger',
+    //     timestamp: new Date(stickerData.timestamp),
+    //     isOwn: false,
+    //     isSticker: true,
+    //     stickerUrl: stickerData.stickerUrl
+    //   }]);
+    // });
+
+    connection.on("WaitingForMatch", (message: string) => {
+      setChatStatus(message);
+      setMessages([]);
+    });
+
+    connection.on("Matched", (message: string) => {
+      setChatStatus(message);
+      setMessages([]);
+    });
+
+    connection.on("ChatEnded", (reason: string) => {
+      setChatStatus(reason);
+      setMessages([]);
+    });
+
+    const startConnection = async () => {
+      try {
+        await connection.start();
+        setIsConnected(true);
+        setChatStatus('Looking for someone to chat with...');
+      } catch (err) {
+        console.error("Connection failed:", err);
+        setTimeout(startConnection, 5000);
+      }
+    };
+
+    startConnection();
+
+    return () => {
+      if (connectionRef.current) {
+        connectionRef.current.stop();
+      }
+    };
   }, []);
 
   // Auto-scroll to bottom when messages change
@@ -33,34 +182,59 @@ const Chat = () => {
   }, [messages]);
 
   const handleEmojiClick = (emojiData: { emoji: string }) => {
-    setInputText((prev) => prev + emojiData.emoji);
+    setInputText(prev => prev + emojiData.emoji);
     inputRef.current?.focus();
   };
 
-  const handleSendMessage = () => {
-    if (inputText.trim() === '') return;
+  const handleSendMessage = async () => {
+    if (inputText.trim() === '' || !connectionRef.current) return;
 
-    // Add user message
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      text: inputText,
-      sender: 'user',
-      timestamp: new Date(),
-    };
-
-    setMessages((prev) => [...prev, newMessage]);
-    setInputText('');
-
-    // Simulate response after a short delay
-    setTimeout(() => {
-      const responseMessage: Message = {
+    try {
+      // Optimistic update
+      const newMessage: Message = {
         id: Date.now().toString(),
-        text: `Reply to: "${inputText}"`,
-        sender: 'other',
+        text: inputText,
+        sender: "You",
         timestamp: new Date(),
+        isOwn: true
       };
-      setMessages((prev) => [...prev, responseMessage]);
-    }, 1000);
+      setMessages(prev => [...prev, newMessage]);
+      setInputText('');
+
+      await connectionRef.current.invoke("SendMessage", inputText);
+    } catch (err) {
+      console.error("Error sending message:", err);
+    }
+  };
+
+  const sendSticker = async (stickerId: string, stickerUrl: string, displayName: string) => {
+    if (!connectionRef.current) return;
+
+    try {
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        text: displayName,
+        sender: "You",
+        timestamp: new Date(),
+        isOwn: true,
+        isSticker: true,
+        stickerUrl: stickerUrl
+      };
+      setMessages(prev => [...prev, newMessage]);
+
+      await connectionRef.current.invoke("SendSticker", stickerId, stickerUrl, displayName);
+    } catch (err) {
+      console.error("Error sending sticker:", err);
+    }
+  };
+
+  const requestNextChat = async () => {
+    if (!connectionRef.current) return;
+    try {
+      await connectionRef.current.invoke("NextChat");
+    } catch (err) {
+      console.error("Error requesting next chat:", err);
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -70,62 +244,75 @@ const Chat = () => {
     }
   };
 
+  
+
   return (
     <div className="w-full max-w-[1896px] h-full max-h-[876px] flex items-center justify-center gap-8">
-      {/* Sidebar Left */}
-      <div className="w-full max-w-[300px] h-full bg-[#2E3440] rounded-[15px] border border-[#3B4252] shadow-[7px_8px_0px_rgba(0,0,0,0.25)]" />
+      {/* Sidebar Left - Users list */}
+     <AdvertTab/>
 
       {/* Chat Main */}
-      <div className="w-full max-w-[1232px] h-full flex flex-col justify-between rounded-[15px] bg-[#2E3440] shadow-[7px_8px_0px_rgba(0,0,0,0.25)]">
+      <div className="w-full max-w-[1232px] h-full flex flex-col justify-between rounded-[10px] 2xl:rounded-[15px] bg-[#2E3440] shadow-[7px_8px_0px_rgba(0,0,0,0.25)]">
         {/* Header */}
-        <div className="flex flex-col items-center justify-center h-[88px] bg-[#3B4252] rounded-t-[15px] gap-1 shadow-[0px_4px_0px_rgba(0,0,0,0.25)]">
-          <h1 className="text-[36px] text-white interSemibold border-b-2 border-[#D8DEE9]">
+        <div className="flex items-center justify-between px-3 h-[75px] 2xl:h-[88px] bg-[#3B4252] rounded-t-[15px] gap-1 shadow-[0px_4px_0px_rgba(0,0,0,0.25)]">
+           <button 
+          onClick={requestNextChat}
+          className="mt-4  w-full max-w-34 bg-main text-xl text-white px-2 py-2 rounded hover:bg-opacity-80 transition"
+        >
+         {'<'} Menu
+        </button>
+          <div className='flex flex-col items-center gap-1'>
+          <h1 className="text-3xl 2xl:text-4xl text-white interSemibold border-b-2 border-[#D8DEE9]">
             <span className="text-main">KIU</span>Vinme
           </h1>
-          <span className="text-[20px] text-[#E5E9F0] leading-none">X people online</span>
+          <span className="text-lg 2xl:text-xl text-[#E5E9F0] leading-none">
+            {isConnected ? 'Connected' : 'Connecting...'}
+          </span>
+          </div>
+          <button 
+          onClick={requestNextChat}
+          className="mt-4 w-full max-w-34 bg-main text-xl text-white px-2 py-2 rounded hover:bg-opacity-80 transition"
+        >
+          Next Chat {'>'}
+        </button>
         </div>
 
         {/* Messages Area */}
         <div className="flex-1 p-4 overflow-y-auto">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`mb-4 flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
-            >
-              <div
-                className={`max-w-[70%] rounded-lg px-4 py-2 ${
-                  message.sender === 'user'
-                    ? 'bg-main text-white rounded-br-none'
-                    : 'bg-[#3B4252] text-[#E5E9F0] rounded-bl-none'
-                }`}
-              >
-                <div className="text-xl">{message.text}</div>
-                <div className="text-md opacity-70 text-right mt-1">
-                  {message.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              </div>
+          {messages.length === 0 ? (
+            <div className="flex items-center text-xl 2xl:text-2xl justify-center h-full text-[#D8DEE9]">
+              {chatStatus}
             </div>
-          ))}
-          <div ref={messagesEndRef} />
+          ) : (
+            <>
+              {messages.map((message) => (
+                <MessageItem key={message.id} message={message} />
+              ))}
+              <div ref={messagesEndRef} />
+            </>
+          )}
         </div>
 
         {/* Input Bar */}
-        <div className="h-[82px] w-full flex items-center gap-5 px-3 bg-[#3B4252] rounded-b-[15px] relative">
-          <input
-            ref={inputRef}
-            className="h-[45px] w-full text-[24px] interRegular rounded-[15px] px-6 bg-[#E5E9F0] shadow-[inset_0_0_1px_2px_rgba(0,0,0,0.25)]"
-            type="text"
-            value={inputText}
-            onChange={(e) => setInputText(e.target.value)}
-            onKeyPress={handleKeyPress}
-            placeholder="Type a message..."
-          />
+        <div className="max-h-[77px] py-3 2xl:max-h-[88px] w-full flex items-center gap-5 px-3 bg-[#3B4252] rounded-b-[15px] relative">
+        <textarea
+  ref={inputRef}
+  className=" min-h-[35px] h-[35px] 2xl:min-h-[45px] 2xl:h-[45px] 2xl:max-h-[70px] w-full text-xl 2xl:text-2xl interRegular rounded-[10px] px-4 2xl:px-6 bg-[#E5E9F0] shadow-[inset_0_0_1px_2px_rgba(0,0,0,0.25)] leading-[35px] 2xl:leading-[45px]"
+  type="text"
+  value={inputText}
+  onChange={(e) => setInputText(e.target.value)}
+  onKeyPress={handleKeyPress}
+  placeholder={isConnected ? "Type a message..." : "Connecting..."}
+  disabled={!isConnected}
+/>
 
-          {/* Emoji Picker Trigger and Popup */}
+          {/* Emoji Picker */}
           <div className="relative">
             <svg
-              onClick={() => setShowEmojiPicker((prev) => !prev)}
-              className="w-[48px] h-[48px] cursor-pointer group"
+              onClick={() => isConnected && setShowEmojiPicker((prev) => !prev)}
+              className={`w-[38px] 2xl:w-[48px]  h-[38px] 2xl:h-[48px] cursor-pointer group ${
+                !isConnected ? 'opacity-50' : ''
+              }`}
               viewBox="0 0 48 48"
               fill="none"
               xmlns="http://www.w3.org/2000/svg"
@@ -137,46 +324,86 @@ const Chat = () => {
               />
             </svg>
 
-            <div
-              className={`absolute bottom-full right-0 mb-6 ${
-                showEmojiPicker ? 'opacity-100 visible' : 'opacity-0 invisible'
-              } transition-all duration-200 animate-slideIn custom-emoji-picker z-50`}
-              ref={emojiPickerRef}
-            >
-              <EmojiPicker
-                onEmojiClick={handleEmojiClick}
-                width={350}
-                height={400}
-                theme="dark"
-                searchDisabled={false}
-                skinTonesDisabled={true}
-                previewConfig={{ showPreview: false }}
-              />
-            </div>
+            {showEmojiPicker && (
+              <div
+                className="absolute bottom-full right-0 mb-6 z-50"
+                ref={emojiPickerRef}
+              >
+                <EmojiPicker
+                  onEmojiClick={handleEmojiClick}
+                  width={350}
+                  height={400}
+                  theme="dark"
+                  searchDisabled={false}
+                  skinTonesDisabled={true}
+                  previewConfig={{ showPreview: false }}
+                />
+              </div>
+            )}
           </div>
 
           {/* Send Button */}
           <button 
             onClick={handleSendMessage}
-            disabled={!inputText.trim()}
-            className={`w-[50px] h-[48px] group transition-colors rounded-[5px] hover:cursor-pointer ${
-              !inputText.trim() ? 'opacity-50' : ''
+            disabled={!inputText.trim() || !isConnected} 
+            className={`w-[44px] 2xl:w-[50px] h-[40px] 2xl:h-[48px] p-1 bg-black group transition-colors rounded-[5px] hover:cursor-pointer ${
+              !inputText.trim() || !isConnected ? 'opacity-50' : ''
             }`}
           >
-            <svg width="48" height="48" viewBox="0 0 35 32" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path 
-                className={`group-hover:fill-main duration-200 ${
-                  inputText.trim() ? 'fill-[#E5E9F0]' : 'fill-[#4C566A]'
-                }`} 
-                d="M17.5635 31.153L0.278564 9.97534L34.0759 0.0435747L17.5635 31.153ZM16.9704 25.0222L27.2576 5.60574L6.16737 11.7861L9.94844 16.4187L19.5126 11.9239L13.1894 20.3895L16.9704 25.0222ZM16.9704 25.0222L11.5689 18.4041L6.16737 11.7861L9.94844 16.4187L13.1894 20.3895L16.9704 25.0222Z" 
-              />
-            </svg>
+           <svg className={"group-hover:fill-main fill-[#E5E9F0]"} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" id="send"><g id="SVGRepo_bgCarrier" stroke-width="0"></g><g id="SVGRepo_tracerCarrier" stroke-linecap="round" stroke-linejoin="round"></g><g id="SVGRepo_iconCarrier"><path d="M21.66,12a2,2,0,0,1-1.14,1.81L5.87,20.75A2.08,2.08,0,0,1,5,21a2,2,0,0,1-1.82-2.82L5.46,13H11a1,1,0,0,0,0-2H5.46L3.18,5.87A2,2,0,0,1,5.86,3.25h0l14.65,6.94A2,2,0,0,1,21.66,12Z"></path></g></svg>
           </button>
         </div>
       </div>
 
-      {/* Sidebar Right */}
-      <div className="w-full max-w-[300px] h-full bg-[#2E3440] rounded-[15px] border border-[#3B4252] shadow-[7px_8px_0px_rgba(0,0,0,0.25)]" />
+      {/* Sidebar Right - Stickers */}
+      <div className="w-full max-w-[250px] 2xl:max-w-[300px] h-full bg-[#2E3440] rounded-[10px] 2xl:rounded-[15px] border border-[#3B4252] shadow-[7px_8px_0px_rgba(0,0,0,0.25)] p-4 overflow-y-auto flex flex-col">
+        <h2 className="text-xl text-[#E5E9F0] mb-4">Stickers</h2>
+        
+        {isLoadingStickers ? (
+          <div className="text-[#D8DEE9] flex-1 flex items-center justify-center">Loading stickers...</div>
+        ) : stickerError ? (
+          <div className="text-red-400 flex-1 flex items-center justify-center">Error: {stickerError}</div>
+        ) : (
+          <>
+            {/* Sticker pack tabs */}
+            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+              {stickerPacks.map((pack, index) => (
+                <button
+                  key={pack.id}
+                  onClick={() => selectStickerPack(pack, index)}
+                  className={`px-3 py-1 rounded-md text-sm ${
+                    index === activeTabIndex
+                      ? 'bg-main text-white'
+                      : 'bg-[#3B4252] text-[#E5E9F0] hover:bg-[#434C5E]'
+                  }`}
+                >
+                  {pack.name} ({pack.stickerCount})
+                </button>
+              ))}
+            </div>
+
+            {/* Stickers grid */}
+            <div className="grid grid-cols-3 gap-2 flex-1 overflow-y-auto">
+              {currentPack?.stickers ? (
+                currentPack.stickers.map((sticker) => (
+                  <button
+                    key={sticker.uid}
+                    onClick={() => sendSticker(sticker.uid, sticker.imageUrl, sticker.displayName)}
+                    className="p-1 hover:bg-[#3B4252] rounded transition-colors flex items-center justify-center"
+                    title={sticker.displayName}
+                  >
+                    <StickerDisplay sticker={sticker} />
+                  </button>
+                ))
+              ) : (
+                <div className="col-span-3 flex items-center justify-center text-[#D8DEE9]">
+                  No stickers loaded
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </div>
   );
 };
