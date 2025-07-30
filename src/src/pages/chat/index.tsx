@@ -10,6 +10,7 @@ import AdvertTab from './advertTabs';
 
 const Chat = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [showStickerPicker, setShowStickerPicker] = useState(false);
   const [inputText, setInputText] = useState('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [isConnected, setIsConnected] = useState(false);
@@ -18,6 +19,7 @@ const Chat = () => {
   const [chatStatus, setChatStatus] = useState<string>('Connecting...');
   
   const emojiPickerRef = useRef<HTMLDivElement | null>(null);
+  const stickerPickerRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const connectionRef = useRef<signalR.HubConnection | null>(null);
@@ -100,6 +102,8 @@ const Chat = () => {
       .configureLogging(signalR.LogLevel.Information)
       .withAutomaticReconnect()
       .build();
+
+      
     console.log(connectionRef.current)
     connectionRef.current = connection;
 
@@ -176,6 +180,23 @@ const Chat = () => {
     };
   }, []);
 
+  // Close popups when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (emojiPickerRef.current && !emojiPickerRef.current.contains(event.target as Node)) {
+        setShowEmojiPicker(false);
+      }
+      if (stickerPickerRef.current && !stickerPickerRef.current.contains(event.target as Node)) {
+        setShowStickerPicker(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   // Auto-scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -221,6 +242,7 @@ const Chat = () => {
         stickerUrl: stickerUrl
       };
       setMessages(prev => [...prev, newMessage]);
+      setShowStickerPicker(false); // Close sticker picker after sending
 
       await connectionRef.current.invoke("SendSticker", stickerId, stickerUrl, displayName);
     } catch (err) {
@@ -249,7 +271,7 @@ const Chat = () => {
   return (
     <div className="w-full max-w-[1896px] h-full max-h-[876px] flex items-center justify-center gap-8">
       {/* Sidebar Left - Users list */}
-     <AdvertTab/>
+      <AdvertTab side='left'/>
 
       {/* Chat Main */}
       <div className="w-full max-w-[1232px] h-full flex flex-col justify-between rounded-[10px] 2xl:rounded-[15px] bg-[#2E3440] shadow-[7px_8px_0px_rgba(0,0,0,0.25)]">
@@ -257,7 +279,7 @@ const Chat = () => {
         <div className="flex items-center justify-between px-3 h-[75px] 2xl:h-[88px] bg-[#3B4252] rounded-t-[15px] gap-1 shadow-[0px_4px_0px_rgba(0,0,0,0.25)]">
            <button 
           onClick={requestNextChat}
-          className="mt-4  w-full max-w-34 bg-main text-xl text-white px-2 py-2 rounded hover:bg-opacity-80 transition"
+          className="mt-4  w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
         >
          {'<'} Menu
         </button>
@@ -271,14 +293,14 @@ const Chat = () => {
           </div>
           <button 
           onClick={requestNextChat}
-          className="mt-4 w-full max-w-34 bg-main text-xl text-white px-2 py-2 rounded hover:bg-opacity-80 transition"
+          className="mt-4 w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
         >
           Next Chat {'>'}
         </button>
         </div>
 
         {/* Messages Area */}
-        <div className="flex-1 p-4 overflow-y-auto">
+        <div className="flex-1 px-4 my-2 overflow-y-auto customScrollbar">
           {messages.length === 0 ? (
             <div className="flex items-center text-xl 2xl:text-2xl justify-center h-full text-[#D8DEE9]">
               {chatStatus}
@@ -305,6 +327,80 @@ const Chat = () => {
   placeholder={isConnected ? "Type a message..." : "Connecting..."}
   disabled={!isConnected}
 />
+
+          {/* Sticker Picker Button */}
+          <div className="relative">
+            <svg
+              onClick={() => isConnected && setShowStickerPicker((prev) => !prev)}
+              className={`w-[38px] 2xl:w-[48px] h-[38px] 2xl:h-[48px] cursor-pointer group ${
+                !isConnected ? 'opacity-50' : ''
+              }`}
+              viewBox="0 0 24 24"
+              fill="none"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                className={`group-hover:fill-main duration-200 ${showStickerPicker ? "fill-main" : ""}`}
+                d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM12 20C7.59 20 4 16.41 4 12C4 7.59 7.59 4 12 4C16.41 4 20 7.59 20 12C20 16.41 16.41 20 12 20ZM7 12C7 10.34 8.34 9 10 9C11.66 9 13 10.34 13 12C13 13.66 11.66 15 10 15C8.34 15 7 13.66 7 12ZM14 9C15.66 9 17 10.34 17 12C17 13.66 15.66 15 14 15C12.34 15 11 13.66 11 12C11 10.34 12.34 9 14 9Z"
+                fill={showStickerPicker ? "#D08770" : "#E5E9F0"}
+              />
+            </svg>
+
+            {/* Sticker Picker Popup */}
+            {showStickerPicker && (
+              <div
+                className="absolute bottom-full right-0 mb-6 z-50 w-[400px] h-[500px] bg-[#2E3440] rounded-[10px] border border-[#3B4252] shadow-[7px_8px_0px_rgba(0,0,0,0.25)] p-4 overflow-hidden flex flex-col"
+                ref={stickerPickerRef}
+              >
+                <h2 className="text-xl text-[#E5E9F0] mb-4">Stickers</h2>
+                
+                {isLoadingStickers ? (
+                  <div className="text-[#D8DEE9] flex-1 flex items-center justify-center">Loading stickers...</div>
+                ) : stickerError ? (
+                  <div className="text-red-400 flex-1 flex items-center justify-center">Error: {stickerError}</div>
+                ) : (
+                  <>
+                    {/* Sticker pack tabs */}
+                    <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
+                      {stickerPacks.map((pack, index) => (
+                        <button
+                          key={pack.id}
+                          onClick={() => selectStickerPack(pack, index)}
+                          className={`px-3 py-1 rounded-md text-sm whitespace-nowrap ${
+                            index === activeTabIndex
+                              ? 'bg-main text-white'
+                              : 'bg-[#3B4252] text-[#E5E9F0] hover:bg-[#434C5E]'
+                          }`}
+                        >
+                          {pack.name} ({pack.stickerCount})
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Stickers grid */}
+                    <div className="grid grid-cols-4 gap-2 flex-1 overflow-y-auto pr-2 customScrollbar">
+                      {currentPack?.stickers ? (
+                        currentPack.stickers.map((sticker) => (
+                          <button
+                            key={sticker.uid}
+                            onClick={() => sendSticker(sticker.uid, sticker.imageUrl, sticker.displayName)}
+                            className="p-1 hover:bg-[#3B4252] rounded transition-colors flex items-center justify-center"
+                            title={sticker.displayName}
+                          >
+                            <StickerDisplay sticker={sticker} />
+                          </button>
+                        ))
+                      ) : (
+                        <div className="col-span-4 flex items-center justify-center text-[#D8DEE9]">
+                          No stickers loaded
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Emoji Picker */}
           <div className="relative">
@@ -337,6 +433,7 @@ const Chat = () => {
                   searchDisabled={false}
                   skinTonesDisabled={true}
                   previewConfig={{ showPreview: false }}
+            
                 />
               </div>
             )}
@@ -354,56 +451,7 @@ const Chat = () => {
           </button>
         </div>
       </div>
-
-      {/* Sidebar Right - Stickers */}
-      <div className="w-full max-w-[250px] 2xl:max-w-[300px] h-full bg-[#2E3440] rounded-[10px] 2xl:rounded-[15px] border border-[#3B4252] shadow-[7px_8px_0px_rgba(0,0,0,0.25)] p-4 overflow-y-auto flex flex-col">
-        <h2 className="text-xl text-[#E5E9F0] mb-4">Stickers</h2>
-        
-        {isLoadingStickers ? (
-          <div className="text-[#D8DEE9] flex-1 flex items-center justify-center">Loading stickers...</div>
-        ) : stickerError ? (
-          <div className="text-red-400 flex-1 flex items-center justify-center">Error: {stickerError}</div>
-        ) : (
-          <>
-            {/* Sticker pack tabs */}
-            <div className="flex gap-2 mb-4 overflow-x-auto pb-2">
-              {stickerPacks.map((pack, index) => (
-                <button
-                  key={pack.id}
-                  onClick={() => selectStickerPack(pack, index)}
-                  className={`px-3 py-1 rounded-md text-sm ${
-                    index === activeTabIndex
-                      ? 'bg-main text-white'
-                      : 'bg-[#3B4252] text-[#E5E9F0] hover:bg-[#434C5E]'
-                  }`}
-                >
-                  {pack.name} ({pack.stickerCount})
-                </button>
-              ))}
-            </div>
-
-            {/* Stickers grid */}
-            <div className="grid grid-cols-3 gap-2 flex-1 overflow-y-auto">
-              {currentPack?.stickers ? (
-                currentPack.stickers.map((sticker) => (
-                  <button
-                    key={sticker.uid}
-                    onClick={() => sendSticker(sticker.uid, sticker.imageUrl, sticker.displayName)}
-                    className="p-1 hover:bg-[#3B4252] rounded transition-colors flex items-center justify-center"
-                    title={sticker.displayName}
-                  >
-                    <StickerDisplay sticker={sticker} />
-                  </button>
-                ))
-              ) : (
-                <div className="col-span-3 flex items-center justify-center text-[#D8DEE9]">
-                  No stickers loaded
-                </div>
-              )}
-            </div>
-          </>
-        )}
-      </div>
+       <AdvertTab side='right'/>
     </div>
   );
 };

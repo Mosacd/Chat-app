@@ -58,6 +58,7 @@ body,
 }
 
 
+
 @layer utilities {
   @keyframes slideIn {
     from {
@@ -69,9 +70,22 @@ body,
       opacity: 1;
     }
   }
-
+  
   .animate-slideIn {
     animation: slideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  }
+
+    .customScrollbar::-webkit-scrollbar {
+    width: 4px;
+  }
+
+  .customScrollbar::-webkit-scrollbar-thumb {
+    background-color: #3B4252;
+    border-radius: 4px;
+  }
+
+  .customScrollbar::-webkit-scrollbar-track {
+    background: #f1f1f1;
   }
 }
 
