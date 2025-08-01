@@ -174,7 +174,7 @@ const AdvertTab = ({ side }: AdvertTabProps) => {
                 <video
                     ref={videoRef}
                     className="w-full h-full object-cover"
-                    {...(side === "left" ? { muted: true } : {})}
+                    muted
                     autoPlay
                     loop={false}
                     playsInline
@@ -195,12 +195,6 @@ const AdvertTab = ({ side }: AdvertTabProps) => {
         <div className="w-full max-w-[250px] 2xl:max-w-[300px] h-full bg-[#2E3440] rounded-[10px] 2xl:rounded-[15px] border border-[#3B4252] shadow-[7px_8px_0px_rgba(0,0,0,0.25)] p-4 flex flex-col gap-4">
             {/* Header */}
             <div className="text-center">
-                <h2 className="text-xl 2xl:text-2xl text-[#E5E9F0] font-semibold">
-                    {side === 'left' ? 'Left Ads' : 'Right Ads'}
-                </h2>
-                <div className="text-sm text-[#D8DEE9] mt-1">
-                    {isLoading ? 'Loading...' : `${mediaList.length} ads available`}
-                </div>
             </div>
 
             {/* Single Video Player */}
@@ -212,10 +206,8 @@ const AdvertTab = ({ side }: AdvertTabProps) => {
             <div className="text-center text-xs text-[#81A1C1]">
                 {error ? (
                     <span className="text-red-400">Connection Error</span>
-                ) : isLoading ? (
+                ) : isLoading && (
                     <span>Loading content...</span>
-                ) : (
-                    <span>Live content</span>
                 )}
             </div>
         </div>
