@@ -183,7 +183,7 @@ const Chatbox = () => {
       <div className="flex items-center justify-between px-3 h-[75px] 2xl:h-[88px] bg-[#3B4252] rounded-t-[15px] gap-1 shadow-[0px_4px_0px_rgba(0,0,0,0.25)]">
         <button
           onClick={requestNextChat}
-          className="mt-4  w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
+          className="cursor-pointer mt-4  w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg transition"
         >
           {"<"} Menu
         </button>
@@ -197,7 +197,7 @@ const Chatbox = () => {
         </div>
         <button
           onClick={requestNextChat}
-          className="mt-4 w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
+          className="cursor-pointer mt-4 w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
         >
           Next Chat {">"}
         </button>
