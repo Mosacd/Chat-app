@@ -4,6 +4,8 @@ import type { Message } from "@/src/utils/types";
 import MessageItem from "@/src/components/messages";
 import StickerPopUp from "../stickerPopUp";
 import EmojiPopUp from "../emojiPopUp";
+import { Textarea } from "@/src/components/ui/textarea";
+import { Link } from "react-router-dom";
 
 const Chatbox = () => {
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -176,17 +178,18 @@ const Chatbox = () => {
       handleSendMessage();
     }
   };
+  
 
   return (
     <div className="w-full max-w-[1232px] h-full flex flex-col justify-between rounded-[10px] 2xl:rounded-[15px] bg-[#2E3440] shadow-[7px_8px_0px_rgba(0,0,0,0.25)]">
       {/* Header */}
       <div className="flex items-center justify-between px-3 h-[75px] 2xl:h-[88px] bg-[#3B4252] rounded-t-[15px] gap-1 shadow-[0px_4px_0px_rgba(0,0,0,0.25)]">
-        <button
+        <Link to={"/"}
           onClick={requestNextChat}
-          className="cursor-pointer mt-4  w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg transition"
+          className="cursor-pointer text-center w-full max-w-26 2xl:max-w-34 font-semibold bg-main hover:bg-main-hover text-md 2xl:text-xl text-white px-2 py-2 rounded-lg transition"
         >
-          {"<"} Menu
-        </button>
+          Menu
+        </Link>
         <div className="flex flex-col items-center gap-1">
           <h1 className="text-3xl 2xl:text-4xl text-white interSemibold border-b-2 border-[#D8DEE9]">
             <span className="text-main">KIU</span>Vinme
@@ -197,31 +200,41 @@ const Chatbox = () => {
         </div>
         <button
           onClick={requestNextChat}
-          className="cursor-pointer mt-4 w-full max-w-26 2xl:max-w-34 font-semibold bg-main text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
+          className="cursor-pointer w-full max-w-26 2xl:max-w-34 font-semibold bg-main hover:bg-main-hover text-md 2xl:text-xl text-white px-2 py-2 rounded-lg hover:bg-opacity-80 transition"
         >
-          Next Chat {">"}
+          Next Chat
         </button>
       </div>
 
       {/* Messages Area */}
       <div className="flex-1 px-4 my-2 overflow-y-auto customScrollbar">
-        {messages.length === 0 ? (
-          <div className="flex items-center text-xl 2xl:text-2xl justify-center h-full text-[#D8DEE9]">
+         
+          <>
+            <div className="flex items-center text-xl 2xl:text-2xl justify-center h-20 text-[#D8DEE9]">
             {chatStatus}
           </div>
-        ) : (
-          <>
             {messages.map((message) => (
               <MessageItem key={message.id} message={message} />
             ))}
             <div ref={messagesEndRef} />
           </>
-        )}
+        
       </div>
 
       {/* Input Bar */}
       <div className="max-h-[77px] py-3 2xl:max-h-[88px] w-full flex items-center gap-5 px-3 bg-[#3B4252] rounded-b-[15px] relative">
-        <textarea
+        <Textarea 
+        ref={inputRef}      
+        className="bg-neutral-950 resize-none text-white min-h-[35px] 2xl:min-h-[45px] 2xl:max-h-[70px] w-full text-lg 2xl:text-xl interRegular rounded-[4px] px-4 2xl:px-6  shadow-[inset_0_0_1px_2px_rgba(0,0,0,0.25)] customScrollbar"    
+
+        value={inputText}
+        onChange={(e) => setInputText(e.target.value)}
+        onKeyPress={handleKeyPress}
+        placeholder={isConnected ? "Type a message..." : "Connecting..."}
+        disabled={!isConnected}
+ />
+        
+        {/* <textarea
           ref={inputRef}
           className=" min-h-[35px] h-[35px] 2xl:min-h-[45px] 2xl:h-[45px] 2xl:max-h-[70px] w-full text-xl 2xl:text-2xl interRegular rounded-[10px] px-4 2xl:px-6 bg-[#E5E9F0] shadow-[inset_0_0_1px_2px_rgba(0,0,0,0.25)] leading-[35px] 2xl:leading-[45px]"
           value={inputText}
@@ -229,7 +242,7 @@ const Chatbox = () => {
           onKeyPress={handleKeyPress}
           placeholder={isConnected ? "Type a message..." : "Connecting..."}
           disabled={!isConnected}
-        />
+        /> */}
 
         <StickerPopUp
           setMessages={setMessages}
@@ -252,7 +265,7 @@ const Chatbox = () => {
         <button
           onClick={handleSendMessage}
           disabled={!inputText.trim() || !isConnected}
-          className={`w-[44px] 2xl:w-[50px] h-[40px] 2xl:h-[48px] p-1 bg-black group transition-colors rounded-[5px] hover:cursor-pointer ${
+          className={`w-[44px] 2xl:w-[50px] h-[40px] 2xl:h-[48px] p-1 bg-neutral-950 group transition-colors rounded-[5px] hover:cursor-pointer ${
             !inputText.trim() || !isConnected ? "opacity-50" : ""
           }`}
         >

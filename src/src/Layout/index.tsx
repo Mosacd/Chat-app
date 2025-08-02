@@ -1,5 +1,4 @@
-import Chat from "../pages/chat";
-import Home from "../pages/home";
+import { Outlet } from "react-router-dom";
 
 
 const Layout = () => {
@@ -7,8 +6,7 @@ const Layout = () => {
     return(
 
 <div className="h-[100%] flex justify-center items-center bg-[#1F232B] p-[42px]">
-        {/* <Home/> */}
-        <Chat/>
+        <Outlet/>
 </div>
 
     )

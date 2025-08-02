@@ -38,7 +38,7 @@ const MessageItem = ({ message }: { message: Message }) => {
             </div>
           ) : (
             <>
-              <div className="text-md 2xl:text-xl font-semibold">{message.text}</div>
+              <div className="text-sm 2xl:text-lg font-semibold">{message.text}</div>
               {/* <div className="text-xs opacity-70 text-right mt-1">
                 {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div> */}
